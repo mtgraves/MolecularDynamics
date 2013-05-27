@@ -18,7 +18,7 @@
 
 import numpy as np
 import pylab as pl
-import argparse, sys
+import argparse, sys, fccLatt, random
 
 def LennardJones(r, i):
     """ 
@@ -48,10 +48,14 @@ def LennardJones(r, i):
 def parseCmd():
     """ parse command line options """
     parser = argparse.ArgumentParser(description='MD for Argon')
-    parser.add_argument("-N", "--numAtoms", type=int, default=3,
-            help="number of Atoms to simulate")
+    parser.add_argument("-N", "--numAtoms", type=int, default=128,
+            help="Number of atoms to simulate")
+    parser.add_argument("-a", "--lattSpacing", type=float, default=10,
+            help="Lattice spacing in Angstroms")
+    parser.add_argument("-T", "--temp", type=float, default=70,
+            help="Temperature in Kelvin")
     parser.add_argument("-D", "--dimension", type=int, default=3,
-            help="number of dimensions")
+            help="Number of dimensions")
     return parser.parse_args()
 
 # =============================================================================
@@ -59,14 +63,33 @@ def main():
 
     args = parseCmd()
 
-    N = args.numAtoms   # number of particles
-    D = args.dimension  # number of dimensions
-    m = 1.0             # mass (see header line)
-    dt = 0.04           # time step
-   
-    # define/compute initial values of r,v,a
-    r = np.array([[2.0, 2.0, 2.0],[3.5, 3.5, 3.5],[1.0, 1.0, 1.0]])
-    v = np.array([[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0]])
+    N = args.numAtoms       # number of particles
+    D = args.dimension      # number of dimensions
+    a = args.lattSpacing    # lattice constant (Angstroms)
+    T = args.temp
+    m = 1.0                 # mass (see header line)
+    dt = 0.04               # time step
+    k = 1.3806488*10**(-23) # Boltzmann constant
+  
+    # set initial positions as FCC lattice
+    uxpos, uypos, uzpos, ucolor = fccLatt.buildUnitCell_FCC(a)
+
+    xpos, ypos, zpos, color = fccLatt.tileEntireLatt(N,
+            uzpos, uypos, uxpos, ucolor, a)
+
+    r = np.array([])
+    for i in range(len(xpos)):
+        r = np.append(r, [xpos[i], ypos[i], zpos[i]])
+    r = np.reshape(r, (N,D))
+    
+    # set initial velocities randomly from Boltzmann distribution
+    v = np.array([])
+    for i in range(N*D):
+        ran = random.gauss(0,1)
+        v = np.append(v, 248.822*ran)   # v = sqrt(kT/m)*ran
+    v = np.reshape(v, (N,D))
+
+    # compute acceleration due to LJ potential
     a = np.array([])
     for i in range(N):
         a = np.append(a, -(1.0/m)*LennardJones(r,i)[1])
